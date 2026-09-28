@@ -111,7 +111,29 @@ def ready(store: ConversationStore = Depends(get_store)):
     Khác /health ở chỗ: endpoint này ĐƯỢC PHÉP kiểm tra dependency. Load
     balancer dùng nó để quyết định có đẩy request vào instance này không.
     """
-    raise NotImplementedError("TODO (CP4): cài đặt /ready")
+
+    # 1 Kiểm tra lifecycle.shutting_down
+    if getattr(lifecycle, "shutting_down", False):
+        return JSONResponse(
+            status_code=503, content={"status": "shutting_down"}
+        )
+    
+    # 2 Kiểm tra Redis
+    try:
+        redis_ready = store.ping()
+    except Exception:
+        redis_ready = False
+
+    if not redis_ready:
+        return JSONResponse(
+            status_code=503, content={"status": "not ready", "redis": False}
+        )
+    
+    # 3 Trả về thông tin sẵn sàng
+    return {"status": "ready", "redis": True}
+
+
+    # raise NotImplementedError("TODO (CP4): cài đặt /ready")
 
 
 # ─────────────────────────────────────────────────────────────
