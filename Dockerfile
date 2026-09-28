@@ -48,7 +48,7 @@ ENV PYTHONUNBUFFERED=1 \
 # 1. Tối ưu Layer Caching: COPY requirements.txt và cài đặt thư viện trước
 COPY requirements.txt .
 
-# Cài đặt thư viện vào thư mục /install để dễ dàng copy sang Stage runtime
+# Cài đặt thư viện vào thư mục /install để copy sang Stage runtime
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 
@@ -62,7 +62,7 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
     PORT=8000
 
-# 2. Cài đặt curl phục vụ HEALTHCHECK (slim image mặc định không có curl)
+# 2. Cài đặt curl phục vụ HEALTHCHECK
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -81,9 +81,12 @@ USER appuser
 
 EXPOSE ${PORT}
 
-# 7. HEALTHCHECK gọi vào endpoint /health
+# 7. Xóa bỏ ENTRYPOINT kế thừa từ base image nếu có
+ENTRYPOINT []
+
+# 8. HEALTHCHECK gọi vào endpoint /health
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# 8. Chạy uvicorn nhận cổng động từ biến môi trường PORT qua shell form / sh
-CMD sh -c "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"
+# 9. Chạy uvicorn nhận cổng động từ biến môi trường PORT
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
