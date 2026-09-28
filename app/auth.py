@@ -19,19 +19,37 @@ def verify_api_key(
     x_api_key: str | None = Header(default=None),
     x_user_id: str | None = Header(default=None),
 ) -> str:
-    """Kiểm tra header ``X-API-Key``; trả về user_id nếu hợp lệ.
+    """Kiểm tra header `X-API-Key` và trả về `user_id` nếu hợp lệ.
 
-    TODO (CP3):
-      1. Lấy khóa đúng từ ``get_settings().agent_api_key``.
-      2. Nếu ``x_api_key`` là None hoặc không khớp → raise
-         ``HTTPException(status_code=401, detail="invalid or missing API key")``.
-      3. So sánh bằng ``secrets.compare_digest(a, b)``, **không dùng** ``==``.
-         Toán tử ``==`` dừng ngay tại ký tự đầu khác nhau, nên thời gian trả
-         lời rò rỉ thông tin về khóa (timing attack). ``compare_digest`` luôn
-         chạy hết chuỗi.
-      4. Hợp lệ → trả về ``x_user_id`` nếu client có gửi, ngược lại trả
-         ``ANONYMOUS_USER``. user_id này là đơn vị để rate limit và tính chi phí.
-
-    Gợi ý: dùng ``status.HTTP_401_UNAUTHORIZED`` cho dễ đọc.
+    Thực hiện xác thực API Key theo các bước:
+      1. Đọc khóa chính xác từ `get_settings().agent_api_key`.
+      2. Nếu thiếu `x_api_key` hoặc khóa không chính xác:
+         Báo lỗi `HTTPException(status_code=401, detail="invalid or missing API key")`.
+      3. So sánh `x_api_key` và khóa cấu hình bằng `secrets.compare_digest(a, b)`
+         để đảm bảo thời gian xử lý đồng nhất (constant-time), phòng chống tấn công rò rỉ
+         thời gian (timing attack). Không dùng toán tử `==`.
+      4. Khi hợp lệ, trả về `x_user_id` nếu client có truyền (và không rỗng),
+         ngược lại trả về giá trị mặc định `ANONYMOUS_USER` ("anonymous").
     """
-    raise NotImplementedError("TODO (CP3): cài đặt verify_api_key")
+    settings = get_settings()
+    expected_api_key = settings.agent_api_key
+
+    # Kiểm tra sự tồn tại của header X-API-Key
+    if x_api_key is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid or missing API key",
+        )
+
+    # So sánh an toàn chống timing attack
+    if not secrets.compare_digest(x_api_key, expected_api_key):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid or missing API key",
+        )
+
+    # Trả về ID định danh người dùng
+    if x_user_id and x_user_id.strip():
+        return x_user_id
+
+    return ANONYMOUS_USER

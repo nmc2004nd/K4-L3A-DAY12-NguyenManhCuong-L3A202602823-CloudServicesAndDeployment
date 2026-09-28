@@ -96,7 +96,7 @@ def health():
     
     # 2 Trả về thông tin service
     return {"status": "ok", "service": SERVICE_NAME, "version": SERVICE_VERSION}
-    raise NotImplementedError("TODO (CP1/CP4): cài đặt /health")
+    # raise NotImplementedError("TODO (CP1/CP4): cài đặt /health")
 
 
 @app.get("/ready")
@@ -154,7 +154,43 @@ def ask(
     ``user_id`` do ``verify_api_key`` trả về, nên request không có API key
     hợp lệ sẽ dừng ở 401 trước khi chạm vào bất cứ dòng nào ở đây.
     """
-    raise NotImplementedError("TODO (CP3/CP4): cài đặt /ask")
+    # 1. Kiểm tra rate limit
+    limiter.check(user_id)
+
+    # 2. Kiểm tra ngân sách
+    guard.check(user_id)
+
+    # 3. Lấy lịch sử hội thoại
+    history = store.get_history(user_id)
+
+    # 4. Gọi LLM
+    result = ask_llm(payload.question, history)
+
+    # 5. Lưu lịch sử hội thoại
+    store.append(user_id, "user", payload.question)
+    store.append(user_id, "assistant", result["answer"])
+
+    # 6. Ghi nhận chi phí
+    guard.record(user_id, result["cost_usd"])
+
+    # 7. Ghi log
+    log_event("ask_completed",
+        user_id=user_id,
+        tokens_in=result["tokens_in"],
+        tokens_out=result["tokens_out"],
+        cost_usd=result["cost_usd"],
+    )
+
+    # 8 Trả về kết quả
+    return {
+        "answer": result["answer"],
+        "user_id": user_id,
+        "history_length": len(history),
+        "cost_usd": result["cost_usd"],
+        "tokens": {"in": result["tokens_in"], "out": result["tokens_out"]},
+    }
+
+    # raise NotImplementedError("TODO (CP3/CP4): cài đặt /ask")
 
 
 if __name__ == "__main__":
