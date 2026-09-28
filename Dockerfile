@@ -21,14 +21,69 @@
 #            docker images day12-agent:prod     # xem dung lượng
 # ═══════════════════════════════════════════════════════════════════
 
-FROM python:3.11
+# FROM python:3.11
+
+# WORKDIR /app
+
+# COPY . .
+
+# RUN pip install -r requirements.txt
+
+# EXPOSE 8000
+
+# CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+
+# ==========================================
+# Stage 1: Builder (Cài đặt dependencies)
+# ==========================================
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
+# Thiết lập môi trường để pip không ghi file cache thừa (.cache)
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+# 1. Tối ưu Layer Caching: COPY requirements.txt và cài đặt thư viện trước
+COPY requirements.txt .
+
+# Cài đặt thư viện vào thư mục /install để dễ dàng copy sang Stage runtime
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+
+# ==========================================
+# Stage 2: Runtime (Image chính thức gọn nhẹ)
+# ==========================================
+FROM python:3.11-slim AS runtime
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1 \
+    PORT=8000
+
+# 2. Cài đặt curl phục vụ HEALTHCHECK (slim image mặc định không có curl)
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# 3. Tạo user thường (non-root) để tăng cường bảo mật
+RUN addgroup --system appgroup && adduser --system --group appuser
+
+# 4. Copy các gói thư viện đã build từ stage builder sang runtime
+COPY --from=builder /install /usr/local
+
+# 5. Copy toàn bộ source code ứng dụng và cấp quyền cho appuser
 COPY . .
+RUN chown -R appuser:appgroup /app
 
-RUN pip install -r requirements.txt
+# 6. Chuyển sang quyền user thường (không chạy dưới root)
+USER appuser
 
-EXPOSE 8000
+EXPOSE ${PORT}
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 7. HEALTHCHECK gọi vào endpoint /health
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
+
+# 8. Chạy uvicorn nhận cổng động từ biến môi trường PORT qua shell form / sh
+CMD sh -c "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"

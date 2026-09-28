@@ -2,5 +2,39 @@
 # Bỏ sót .env = leak secret vào image. Bỏ sót .git = image phình to.
 # Bổ sung đủ các mục còn thiếu — xem tests/test_cp2.py để biết yêu cầu.
 
+# Version Control & Git metadata (Tránh làm phình dung lượng image)
 .git
 .gitignore
+
+# Environment & Secrets (NGHIÊM CẤM COPY: Tránh lộ secrets/credentials)
+.env
+.env.*
+*.pem
+*.key
+
+# Python Virtual Environments & Packages
+venv/
+.venv/
+env/
+ENV/
+
+# Python Cache & Compiled Files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Testing, Coverage & CI/CD
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Docker & IDE Configs
+Dockerfile
+.dockerignore
+.vscode/
+.idea/
+
+# OS/System Junk Files
+.DS_Store
+Thumbs.db
