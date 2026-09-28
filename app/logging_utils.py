@@ -34,4 +34,25 @@ def log_event(event: str, level: str = "info", **fields) -> str:
         >>> log_event("ask_completed", user_id="sv01", cost_usd=0.0001)
         '{"event": "ask_completed", "level": "info", "timestamp": "...", ...}'
     """
+
+    # 1: Khởi tạo
+    log_dct = {
+        "event": event,
+        "level": level.lower(),
+        "timestamp": utc_now_iso(),
+    }
+
+    # 2: Gộp các trường
+    log_dct.update(fields)
+
+    # 3: Chuyển sang JSON
+    log_json = json.dumps(log_dct, ensure_ascii=False)
+
+    # 4: In ra stdout
+    print(log_json, file=sys.stdout, flush=True)
+
+    # 5: Trả về chuỗi JSON
+    return log_json
+
+
     raise NotImplementedError("TODO (CP1): cài đặt log_event")
